@@ -50,7 +50,6 @@ public class SimpleRollOpening extends WorldOpening {
     private void onFirstTick() {
         Block block = this.source.getBlock();
 
-        Location center;
         if (block == null) {
             Location playerLoc = this.player.getEyeLocation().clone();
             Vector direction = playerLoc.getDirection();
@@ -59,19 +58,23 @@ public class SimpleRollOpening extends WorldOpening {
                 playerLoc.add(direction);
             }
 
-            center = LocationUtil.setCenter3D(playerLoc);
+            this.displayLocation = LocationUtil.setCenter3D(playerLoc);
         }
         else {
-            double offset = Math.max(0, this.crate.getHologramYOffset());
-            double height = block.getBoundingBox().getHeight() + offset;
-
-            center = LocationUtil.setCenter2D(block.getLocation()).add(0, height, 0);
-
-            WorldPos blockPos = WorldPos.from(block);
-            this.hideHologram(blockPos);
+            // 在Folia环境中，block.getBoundingBox().getHeight()需要区域线程访问
+            // 使用区域调度器在方块所在的位置上执行任务
+            Location blockLocation = block.getLocation();
+            this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+                double offset = Math.max(0, this.crate.getHologramYOffset());
+                double height = block.getBoundingBox().getHeight() + offset;
+                
+                Location center = LocationUtil.setCenter2D(block.getLocation()).add(0, height, 0);
+                WorldPos blockPos = WorldPos.from(block);
+                this.hideHologram(blockPos);
+                
+                this.displayLocation = center;
+            }, blockLocation);
         }
-
-        this.displayLocation = center;
     }
 
     @Override
@@ -130,7 +133,17 @@ public class SimpleRollOpening extends WorldOpening {
         this.addReward(this.reward);
 
         if (this.rewardDisplay != null) {
-            this.rewardDisplay.remove();
+            // 在Folia环境中，实体移除必须在正确的区域线程中执行
+            if (this.rewardDisplay.getLocation().getWorld() != null) {
+                this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+                    try {
+                        this.rewardDisplay.remove();
+                    } catch (Exception e) {
+                        // 捕获移除实体时的异常，防止崩溃
+                        this.plugin.error("Failed to remove reward display: " + e.getMessage());
+                    }
+                }, this.rewardDisplay.getLocation());
+            }
             this.rewardDisplay = null;
         }
 
@@ -159,29 +172,56 @@ public class SimpleRollOpening extends WorldOpening {
     private void displayReward() {
         Reward reward = this.isSpinsCompleted() ? this.reward : this.crate.rollReward(this.player);
 
-        if (this.rewardDisplay == null) {
-            this.rewardDisplay = player.getWorld().spawn(this.displayLocation, Item.class, item -> item.setVelocity(new Vector()));
-            this.rewardDisplay.setPersistent(false);
-            this.rewardDisplay.setCustomNameVisible(true);
-            this.rewardDisplay.setGravity(false);
-            this.rewardDisplay.setPickupDelay(Integer.MAX_VALUE);
-            this.rewardDisplay.setUnlimitedLifetime(true);
-            this.rewardDisplay.setInvulnerable(true);
-            //this.rewardDisplay.setBillboard(Display.Billboard.CENTER);
-            //this.rewardDisplay.setTransformation(new Transformation(new Vector3f(), new AxisAngle4f(), new Vector3f(0.35f, 0.35f, 0.35f), new AxisAngle4f()));
+        // 检查displayLocation是否已设置且世界有效
+        if (this.displayLocation == null || this.displayLocation.getWorld() == null) {
+            return; // 如果位置未设置或世界无效，跳过显示
         }
+
+        if (this.rewardDisplay == null) {
+            // 使用区域调度器在正确的位置生成物品实体
+            this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+                try {
+                    this.rewardDisplay = player.getWorld().spawn(this.displayLocation, Item.class, item -> item.setVelocity(new Vector()));
+                    this.rewardDisplay.setPersistent(false);
+                    this.rewardDisplay.setCustomNameVisible(true);
+                    this.rewardDisplay.setGravity(false);
+                    this.rewardDisplay.setPickupDelay(Integer.MAX_VALUE);
+                    this.rewardDisplay.setUnlimitedLifetime(true);
+                    this.rewardDisplay.setInvulnerable(true);
+                    //this.rewardDisplay.setBillboard(Display.Billboard.CENTER);
+                    //this.rewardDisplay.setTransformation(new Transformation(new Vector3f(), new AxisAngle4f(), new Vector3f(0.35f, 0.35f, 0.35f), new AxisAngle4f()));
+                } catch (Exception e) {
+                    // 捕获生成实体时的异常，防止崩溃
+                    this.plugin.error("Failed to spawn reward display: " + e.getMessage());
+                }
+            }, this.displayLocation);
+        }
+        
         if (this.rewardDisplay != null) {
             ItemStack itemStack = reward.getPreviewItem();
-            this.rewardDisplay.setItemStack(itemStack);
-            EntityUtil.setCustomName(this.rewardDisplay, reward.getName());
+            // 在Folia环境中，设置实体物品堆栈必须在正确的区域线程中执行
+            if (this.rewardDisplay.getLocation().getWorld() != null) {
+                this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+                    try {
+                        this.rewardDisplay.setItemStack(itemStack);
+                        EntityUtil.setCustomName(this.rewardDisplay, reward.getName());
+                    } catch (Exception e) {
+                        // 捕获设置物品堆栈时的异常，防止崩溃
+                        this.plugin.error("Failed to set reward display item: " + e.getMessage());
+                    }
+                }, this.rewardDisplay.getLocation());
+            }
         }
 
-        VanillaSound.of(Sound.UI_BUTTON_CLICK, 0.5f).play(this.displayLocation);
-        VanillaSound.of(Sound.BLOCK_NOTE_BLOCK_BELL, 0.5f).play(this.displayLocation);
+        // 播放音效，使用区域调度器确保在正确的位置
+        this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+            VanillaSound.of(Sound.UI_BUTTON_CLICK, 0.5f).play(this.displayLocation);
+            VanillaSound.of(Sound.BLOCK_NOTE_BLOCK_BELL, 0.5f).play(this.displayLocation);
 
-        if (this.isSpinsCompleted()) {
-            VanillaSound.of(Sound.ENTITY_GENERIC_EXPLODE, 0.7f).play(this.displayLocation);
-            OpeningUtils.createFirework(this.displayLocation);
-        }
+            if (this.isSpinsCompleted()) {
+                VanillaSound.of(Sound.ENTITY_GENERIC_EXPLODE, 0.7f).play(this.displayLocation);
+                OpeningUtils.createFirework(this.displayLocation);
+            }
+        }, this.displayLocation);
     }
 }

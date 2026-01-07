@@ -51,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -221,10 +222,45 @@ public class Crate implements ConfigBacked {
 
         this.blockPositions.addAll(config.getStringList("Block.Positions").stream().map(WorldPos::deserialize).toList());
         if (!Config.isCrateInAirBlocksAllowed()) {
-            this.blockPositions.removeIf(pos -> {
-                Block block = pos.toBlock();
-                return block != null && block.isEmpty();
-            });
+            // 在Folia环境中，block.isEmpty()需要主线程访问
+            // 使用线程安全的集合和原子计数器来跟踪任务完成
+            Set<WorldPos> positionsToRemove = Collections.synchronizedSet(new HashSet<>());
+            AtomicInteger tasksRemaining = new AtomicInteger(0);
+            
+            for (WorldPos pos : this.blockPositions) {
+                Location location = pos.toLocation();
+                if (location != null && location.getWorld() != null) {
+                    tasksRemaining.incrementAndGet();
+                    
+                    // 使用区域调度器在正确的位置上执行任务
+                    this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+                        try {
+                            Block block = pos.toBlock();
+                            if (block != null && block.isEmpty()) {
+                                positionsToRemove.add(pos);
+                            }
+                        } finally {
+                            // 确保计数器递减，即使出现异常
+                            if (tasksRemaining.decrementAndGet() == 0) {
+                                // 所有任务完成，移除空方块位置
+                                this.plugin.runTask(task -> {
+                                    this.blockPositions.removeAll(positionsToRemove);
+                                });
+                            }
+                        }
+                    }, location);
+                }
+            }
+            
+            // 如果没有任务需要执行，立即检查是否需要移除
+            if (tasksRemaining.get() == 0) {
+                this.plugin.runTask(task -> {
+                    this.blockPositions.removeIf(pos -> {
+                        Block block = pos.toBlock();
+                        return block != null && block.isEmpty();
+                    });
+                });
+            }
         }
 
         this.setPushbackEnabled(config.getBoolean("Block.Pushback.Enabled"));

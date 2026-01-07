@@ -28,6 +28,7 @@ import java.util.*;
 public class HologramManager extends AbstractManager<CratesPlugin> {
 
     private final Map<String, FakeDisplay> displayMap;
+    private boolean isFolia;
 
     private HologramHandler handler;
 
@@ -41,7 +42,25 @@ public class HologramManager extends AbstractManager<CratesPlugin> {
         if (this.detectHandler()) {
             this.addListener(new HologramListener(this.plugin, this));
 
-            this.addAsyncTask(this::tickHolograms, Config.CRATE_HOLOGRAM_UPDATE_INTERVAL.get());
+            // 在Folia服务器上，涉及世界操作的任务必须使用同步调度器
+        this.isFolia = false;
+        try {
+            // 使用反射检测Folia环境：检查是否存在Folia特有的类
+            Class.forName("io.papermc.paper.threadedregions.scheduler.RegionScheduler");
+            this.isFolia = true;
+        } catch (ClassNotFoundException e) {
+            // 类不存在，说明是传统Bukkit服务器
+            this.isFolia = false;
+        }
+        
+        // 延迟启动调度器任务，确保CrateManager已经初始化完成
+        this.plugin.runTaskLater(task -> {
+            if (this.isFolia) {
+                this.addTask(this::tickHolograms, Config.CRATE_HOLOGRAM_UPDATE_INTERVAL.get());
+            } else {
+                this.addAsyncTask(this::tickHolograms, Config.CRATE_HOLOGRAM_UPDATE_INTERVAL.get());
+            }
+        }, 20L); // 延迟1秒（20 ticks）启动
         }
     }
 
@@ -71,6 +90,9 @@ public class HologramManager extends AbstractManager<CratesPlugin> {
     }
 
     private void tickHolograms() {
+        // 安全检查：确保CrateManager已经初始化
+        if (this.plugin.getCrateManager() == null) return;
+        
         this.plugin.getCrateManager().getCrates().forEach(crate -> {
             if (!crate.isHologramEnabled()) return;
 
@@ -210,24 +232,43 @@ public class HologramManager extends AbstractManager<CratesPlugin> {
         double yOffset = crate.getHologramYOffset() + 0.2;
         double lineGap = Config.CRATE_HOLOGRAM_LINE_GAP.get();
 
-        crate.getBlockPositions().forEach(blockPos -> {
-            Block block = blockPos.toBlock();
-            if (block == null) return;
+        // 在Folia环境中，需要为每个位置单独调度任务
+        if (isFolia) {
+            crate.getBlockPositions().forEach(blockPos -> {
+                Block block = blockPos.toBlock();
+                if (block == null) return;
 
-            double height = block.getBoundingBox().getHeight() / 2D + yOffset;
+                // 使用位置调度器来确保在主线程中执行世界操作
+                Location location = block.getLocation();
+                this.plugin.getNightScheduler().runTaskAtLocation(() -> {
+                    createHologramGroup(display, blockPos, block, originText, yOffset, lineGap);
+                }, location);
+            });
+        } else {
+            // 传统Bukkit服务器，直接在主线程中执行
+            crate.getBlockPositions().forEach(blockPos -> {
+                Block block = blockPos.toBlock();
+                if (block == null) return;
 
-            // Allocate ID values for our fake entities, so there is no clash with new server entities.
-
-            FakeEntityGroup group = display.getGroupOrCreate(blockPos);
-
-            for (int index = 0; index < originText.size(); index++) {
-                double gap = lineGap * index;
-
-                Location location = LocationUtil.setCenter3D(block.getLocation()).add(0, height + gap, 0);
-                group.addEntity(FakeEntity.create(location));
-            }
-        });
+                createHologramGroup(display, blockPos, block, originText, yOffset, lineGap);
+            });
+        }
 
         this.displayMap.put(crate.getId(), display);
+    }
+
+    private void createHologramGroup(@NotNull FakeDisplay display, @NotNull WorldPos blockPos, @NotNull Block block, 
+                                    @NotNull List<String> originText, double yOffset, double lineGap) {
+        double height = block.getBoundingBox().getHeight() / 2D + yOffset;
+
+        // Allocate ID values for our fake entities, so there is no clash with new server entities.
+        FakeEntityGroup group = display.getGroupOrCreate(blockPos);
+
+        for (int index = 0; index < originText.size(); index++) {
+            double gap = lineGap * index;
+
+            Location location = LocationUtil.setCenter3D(block.getLocation()).add(0, height + gap, 0);
+            group.addEntity(FakeEntity.create(location));
+        }
     }
 }
