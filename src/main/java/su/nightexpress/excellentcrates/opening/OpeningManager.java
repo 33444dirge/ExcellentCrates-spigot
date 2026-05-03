@@ -175,6 +175,13 @@ public class OpeningManager extends AbstractManager<CratesPlugin> {
         return !this.isOpening(player);
     }
 
+    public boolean isOpeningAvailable(@NotNull Player player, boolean hasAnimation) {
+        if (!hasAnimation) {
+            return true;
+        }
+        return !this.isOpening(player);
+    }
+
     @NotNull
     public Opening createOpening(@NotNull Player player, @NotNull CrateSource source, @Nullable Cost cost) {
         Crate crate = source.getCrate();
@@ -189,10 +196,14 @@ public class OpeningManager extends AbstractManager<CratesPlugin> {
     }
 
     public void startOpening(@NotNull Player player, @NotNull Opening opening, boolean instaRoll) {
-        this.openingByPlayerMap.putIfAbsent(player.getUniqueId(), opening);
+        this.openingByPlayerMap.put(player.getUniqueId(), opening);
 
         opening.start(); // Start ticking
 
-        if (instaRoll) opening.instaRoll();
+        if (instaRoll) {
+            opening.instaRoll();
+            // For instant roll (no animation), remove immediately to allow fast clicking
+            this.openingByPlayerMap.remove(player.getUniqueId());
+        }
     }
 }

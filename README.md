@@ -46,14 +46,14 @@
 - [**PlaceholderAPI**](https://nightexpressdev.com/excellentcrates/hooks/placeholder_api/) Support!
 
 ## System Requirements
-- Server Software: [**Spigot**](https://www.spigotmc.org/link-forums/88/) or [**Paper**](https://papermc.io/downloads/paper)
+- Server Software: [**Spigot**](https://www.spigotmc.org/link-forums/88/), [**Paper**](https://papermc.io/downloads/paper), or [**Folia**](https://papermc.io/downloads/folia)
 - Server Version: <span style="color:red">**1.21.8**</span> or above
 - Java Version: [**21**](https://adoptium.net/temurin/releases) or above
 - Dependencies:
     - [**nightcore**](https://nightexpressdev.com/nightcore/) - Plugin engine.
 - Optional Plugins:
     - [**PacketEvents**](https://spigotmc.org/resources/80279/) or [**ProtocolLib**](https://ci.dmulloy2.net/job/ProtocolLib/) - Crate holograms.
-- Folia Supported: <span style="color:red">**No**</span>
+- Folia Supported: <span style="color:green">**Yes**</span>
 - Forge Supported: <span style="color:red">**No**</span>
 
 ## Links

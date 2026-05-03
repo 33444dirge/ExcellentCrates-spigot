@@ -41,7 +41,7 @@ public class HologramManager extends AbstractManager<CratesPlugin> {
         if (this.detectHandler()) {
             this.addListener(new HologramListener(this.plugin, this));
 
-            this.addAsyncTask(this::tickHolograms, Config.CRATE_HOLOGRAM_UPDATE_INTERVAL.get());
+            this.addTask(this::tickHolograms, Config.CRATE_HOLOGRAM_UPDATE_INTERVAL.get());
         }
     }
 
@@ -74,7 +74,15 @@ public class HologramManager extends AbstractManager<CratesPlugin> {
         this.plugin.getCrateManager().getCrates().forEach(crate -> {
             if (!crate.isHologramEnabled()) return;
 
-            this.render(crate);
+            Set<Location> locations = crate.getBlockPositions().stream()
+                .map(WorldPos::toLocation)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+            
+            if (!locations.isEmpty()) {
+                Location firstLocation = locations.iterator().next();
+                this.plugin.runTask(firstLocation, () -> this.render(crate));
+            }
         });
     }
 

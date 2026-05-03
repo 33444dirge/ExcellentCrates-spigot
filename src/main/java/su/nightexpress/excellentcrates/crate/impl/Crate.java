@@ -220,11 +220,19 @@ public class Crate implements ConfigBacked {
         });
 
         this.blockPositions.addAll(config.getStringList("Block.Positions").stream().map(WorldPos::deserialize).toList());
+        
         if (!Config.isCrateInAirBlocksAllowed()) {
-            this.blockPositions.removeIf(pos -> {
-                Block block = pos.toBlock();
-                return block != null && block.isEmpty();
-            });
+            for (WorldPos pos : new ArrayList<>(this.blockPositions)) {
+                Location location = pos.toLocation();
+                if (location != null) {
+                    this.plugin.runTask(location, () -> {
+                        Block block = location.getBlock();
+                        if (block != null && block.isEmpty()) {
+                            this.blockPositions.remove(pos);
+                        }
+                    });
+                }
+            }
         }
 
         this.setPushbackEnabled(config.getBoolean("Block.Pushback.Enabled"));
