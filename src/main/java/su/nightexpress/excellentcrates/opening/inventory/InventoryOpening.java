@@ -16,8 +16,8 @@ import su.nightexpress.excellentcrates.opening.inventory.spinner.SpinnerHolder;
 import su.nightexpress.excellentcrates.opening.inventory.spinner.SpinnerType;
 import su.nightexpress.nightcore.util.NumberUtil;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class InventoryOpening extends AbstractOpening {
 
@@ -38,7 +38,7 @@ public class InventoryOpening extends AbstractOpening {
         super(plugin, player, source, cost);
         this.view = view;
         this.config = config;
-        this.spinners = new ArrayList<>();
+        this.spinners = new CopyOnWriteArrayList<>();
         this.closeTicks = config.getCompletionPauseTicks();
         this.launchTicks = 0L;
     }
