@@ -10,9 +10,9 @@ import su.nightexpress.excellentcrates.crate.impl.CrateSource;
 import su.nightexpress.excellentcrates.opening.AbstractOpening;
 import su.nightexpress.nightcore.util.random.Rnd;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SelectableOpening extends AbstractOpening {
 
@@ -32,7 +32,7 @@ public class SelectableOpening extends AbstractOpening {
         super(plugin, player, source, cost);
         this.menu = menu;
         this.provider = provider;
-        this.selectedRewards = new HashSet<>();
+        this.selectedRewards = ConcurrentHashMap.newKeySet();
     }
 
     @Override

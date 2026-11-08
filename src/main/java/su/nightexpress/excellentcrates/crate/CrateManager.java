@@ -536,7 +536,8 @@ public class CrateManager extends AbstractManager<CratesPlugin> {
         }
 
         // Check if player is in other opening or if crate block is occupied by others.
-        if (!this.plugin.getOpeningManager().isOpeningAvailable(player)) {
+        // Only check if crate has animation enabled
+        if (!this.plugin.getOpeningManager().isOpeningAvailable(player, crate.isOpeningEnabled())) {
             Lang.CRATE_OPEN_ERROR_ALREADY.message().send(player);
             return false;
         }

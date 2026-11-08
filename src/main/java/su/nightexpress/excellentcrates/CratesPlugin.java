@@ -91,6 +91,9 @@ public class CratesPlugin extends NightPlugin {
         this.userManager = new UserManager(this, this.dataHandler);
         this.userManager.setup();
 
+        this.crateManager = new CrateManager(this, this.dialogRegistry);
+        this.crateManager.setup();
+
         if (Config.HOLOGRAMS_ENABLED.get()) {
             this.hologramManager = new HologramManager(this);
             this.hologramManager.setup();
@@ -101,9 +104,6 @@ public class CratesPlugin extends NightPlugin {
 
         this.keyManager = new KeyManager(this, this.dialogRegistry);
         this.keyManager.setup();
-
-        this.crateManager = new CrateManager(this, this.dialogRegistry);
-        this.crateManager.setup();
 
         this.editorManager = new EditorManager(this, this.dialogRegistry);
         this.editorManager.setup();

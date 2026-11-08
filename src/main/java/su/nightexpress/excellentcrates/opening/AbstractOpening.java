@@ -17,9 +17,9 @@ import su.nightexpress.excellentcrates.user.CrateUser;
 import su.nightexpress.nightcore.util.Players;
 import su.nightexpress.nightcore.util.placeholder.Replacer;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 public abstract class AbstractOpening implements Opening {
@@ -41,7 +41,7 @@ public abstract class AbstractOpening implements Opening {
         this.source = source;
         this.crate = source.getCrate();
         this.cost = cost;
-        this.rewards = new ArrayList<>();
+        this.rewards = new CopyOnWriteArrayList<>();
         this.setRefundable(true);
     }
 
